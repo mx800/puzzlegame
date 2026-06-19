@@ -19,6 +19,7 @@ import {
   Download
 } from "lucide-react";
 import { PuzzleConfig, PuzzlePiece } from "../types";
+import { decodePuzzle } from "../lib/share";
 
 // Custom coquin confetti rain with hearts and sensual colors
 const ConfettiRain = () => {
@@ -74,12 +75,12 @@ const ConfettiRain = () => {
 };
 
 interface PuzzlePlayerProps {
-  puzzleId: string;
+  encodedData: string;
   onBackToCreator: () => void;
 }
 
 export const PuzzlePlayer: React.FC<PuzzlePlayerProps> = ({
-  puzzleId,
+  encodedData,
   onBackToCreator,
 }) => {
   const [puzzle, setPuzzle] = useState<PuzzleConfig | null>(null);
@@ -180,46 +181,27 @@ export const PuzzlePlayer: React.FC<PuzzlePlayerProps> = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch puzzle from state/backend on mount
+  // Décode le puzzle directement depuis le lien (#p=<token>) : aucun serveur.
   useEffect(() => {
-    const fetchPuzzle = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/puzzles/${puzzleId}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error("Ce lien de puzzle n'existe pas ou l'image a été retirée.");
-          }
-          throw new Error("Impossible de charger le puzzle.");
-        }
-        const data = await response.json();
-        setPuzzle(data);
-        
-        // Dynamically load the pre-configured difficulty options set during creation
-        if (data.fogIntensity) {
-          setFogIntensity(data.fogIntensity);
-        } else {
-          setFogIntensity("off"); // Backwards compatibility default
-        }
-        
-        if (data.veilMode) {
-          setVeilMode(data.veilMode);
-        } else {
-          setVeilMode("off"); // Backwards compatibility default
-        }
+    setIsLoading(true);
+    setError(null);
 
-        setupGame(data.gridSize);
-      } catch (err: any) {
-        console.error("Fetch err:", err);
-        setError(err.message || "Erreur de connexion.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    const data = decodePuzzle(encodedData);
+    if (!data) {
+      setError("Ce lien de puzzle est invalide ou a été corrompu.");
+      setIsLoading(false);
+      return;
+    }
 
-    fetchPuzzle();
-  }, [puzzleId]);
+    setPuzzle(data);
+
+    // Charge les options de difficulté pré-configurées à la création
+    setFogIntensity(data.fogIntensity || "off"); // Défaut rétro-compatible
+    setVeilMode(data.veilMode || "off"); // Défaut rétro-compatible
+
+    setupGame(data.gridSize);
+    setIsLoading(false);
+  }, [encodedData]);
 
   // Handle active countdown timer
   useEffect(() => {

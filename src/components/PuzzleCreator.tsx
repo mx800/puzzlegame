@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { PresetSelector } from "./PresetSelector";
+import { compressImage, encodePuzzle } from "../lib/share";
 import {
   Upload,
   User,
@@ -17,18 +18,14 @@ import {
   Eye
 } from "lucide-react";
 
-interface PuzzleCreatorProps {
-  onPuzzleCreated: (puzzleId: string) => void;
-}
-
-export const PuzzleCreator: React.FC<PuzzleCreatorProps> = ({ onPuzzleCreated }) => {
+export const PuzzleCreator: React.FC = () => {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [gridSize, setGridSize] = useState<number>(3); // Default 3x3
   const [imageData, setImageData] = useState<string>("");
   const [isDragActive, setIsDragActive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [sharedId, setSharedId] = useState<string | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Spicy setting values set of game creation
@@ -95,40 +92,30 @@ export const PuzzleCreator: React.FC<PuzzleCreatorProps> = ({ onPuzzleCreated })
 
     setIsSaving(true);
     try {
-      const response = await fetch("/api/puzzles", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          author: author.trim() || undefined,
-          gridSize,
-          imageData,
-          fogIntensity,
-          veilMode,
-        }),
+      // Compresse l'image uploadée (les presets restent des URLs courtes),
+      // puis encode tout le puzzle dans le lien : aucun serveur requis.
+      const compressedImage = await compressImage(imageData);
+      const token = encodePuzzle({
+        title: title.trim(),
+        author: author.trim() || "Anonyme",
+        gridSize,
+        imageData: compressedImage,
+        fogIntensity,
+        veilMode,
+        createdAt: Date.now(),
       });
-
-      if (!response.ok) {
-        throw new Error("L'envoi a échoué");
-      }
-
-      const data = await response.json();
-      if (data.id) {
-        setSharedId(data.id);
-      }
+      setShareToken(token);
     } catch (err) {
       console.error(err);
-      alert("Impossible d'enregistrer le puzzle. Assurez-vous que le serveur fonctionne.");
+      alert("Impossible de générer le lien du puzzle. Réessayez avec une autre image.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const getSharingUrl = () => {
-    if (!sharedId) return "";
-    return `${window.location.origin}?puzzle=${sharedId}`;
+    if (!shareToken) return "";
+    return `${window.location.origin}${window.location.pathname}#p=${shareToken}`;
   };
 
   const copyToClipboard = () => {
@@ -159,7 +146,7 @@ export const PuzzleCreator: React.FC<PuzzleCreatorProps> = ({ onPuzzleCreated })
       </motion.div>
 
       <AnimatePresence mode="wait">
-        {!sharedId ? (
+        {!shareToken ? (
           <motion.form
             key="creator-form"
             initial={{ opacity: 0, scale: 0.98 }}
@@ -504,7 +491,7 @@ export const PuzzleCreator: React.FC<PuzzleCreatorProps> = ({ onPuzzleCreated })
                 type="button"
                 id="create-new-puzzle-btn"
                 onClick={() => {
-                  setSharedId(null);
+                  setShareToken(null);
                   setTitle("");
                   setAuthor("");
                 }}

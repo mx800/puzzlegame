@@ -4,36 +4,29 @@ import { PuzzlePlayer } from "./components/PuzzlePlayer";
 import { Sparkles, Heart } from "lucide-react";
 
 export default function App() {
-  const [activePuzzleId, setActivePuzzleId] = useState<string | null>(null);
+  // Le puzzle entier est encodé dans le fragment d'URL (#p=<token>) : aucun
+  // serveur n'est nécessaire, l'app fonctionne en statique (GitHub Pages).
+  const [activeToken, setActiveToken] = useState<string | null>(null);
 
-  // Monitor the URL query parameter for puzzle IDs on mount and during shifts
   useEffect(() => {
-    const handleUrlRouting = () => {
-      const params = new URLSearchParams(window.location.search);
-      const puzzleParam = params.get("puzzle");
-      if (puzzleParam) {
-        setActivePuzzleId(puzzleParam);
-      } else {
-        setActivePuzzleId(null);
-      }
+    const handleRouting = () => {
+      const hash = window.location.hash;
+      const token = hash.startsWith("#p=") ? hash.slice(3) : null;
+      setActiveToken(token);
     };
 
-    handleUrlRouting();
-    window.addEventListener("popstate", handleUrlRouting);
-    return () => window.removeEventListener("popstate", handleUrlRouting);
+    handleRouting();
+    window.addEventListener("popstate", handleRouting);
+    window.addEventListener("hashchange", handleRouting);
+    return () => {
+      window.removeEventListener("popstate", handleRouting);
+      window.removeEventListener("hashchange", handleRouting);
+    };
   }, []);
 
-  const handlePuzzleCreated = (id: string) => {
-    // Navigate using browser history API so that it triggers state update seamlessly
-    const newUrl = `${window.location.origin}?puzzle=${id}`;
-    window.history.pushState({ puzzleId: id }, "", newUrl);
-    setActivePuzzleId(id);
-  };
-
   const handleBackToCreator = () => {
-    const newUrl = window.location.origin;
-    window.history.pushState(null, "", newUrl);
-    setActivePuzzleId(null);
+    window.history.pushState(null, "", window.location.pathname);
+    setActiveToken(null);
   };
 
   return (
@@ -63,7 +56,7 @@ export default function App() {
               onClick={handleBackToCreator}
               id="header-create-link"
               className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
-                !activePuzzleId
+                !activeToken
                   ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
                   : "text-neutral-400 hover:text-white"
               }`}
@@ -80,13 +73,13 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 relative z-10" id="app-main-viewport">
-        {activePuzzleId ? (
+        {activeToken ? (
           <PuzzlePlayer
-            puzzleId={activePuzzleId}
+            encodedData={activeToken}
             onBackToCreator={handleBackToCreator}
           />
         ) : (
-          <PuzzleCreator onPuzzleCreated={handlePuzzleCreated} />
+          <PuzzleCreator />
         )}
       </main>
 

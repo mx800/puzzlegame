@@ -3,8 +3,11 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({command}) => {
   return {
+    // En production (GitHub Pages) l'app est servie depuis /puzzlegame/.
+    // En dev local, le serveur Express sert à la racine, donc base = '/'.
+    base: command === 'build' ? '/puzzlegame/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
