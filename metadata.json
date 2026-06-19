@@ -1,0 +1,6 @@
+{
+  "name": "Photo Puzzle Maker",
+  "description": "Transformez vos photos en puzzles personnalisables et partagez-les en ligne avec vos amis pour qu'ils puissent les résoudre.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
