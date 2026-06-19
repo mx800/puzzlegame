@@ -492,7 +492,7 @@ export const PuzzleCreator: React.FC = () => {
                   {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 </button>
               </div>
-              {linkLength > 18000 && (
+              {linkLength > 14000 && (
                 <p className="text-[11px] text-amber-300/90 leading-relaxed flex items-start gap-1.5">
                   <Flame className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400" />
                   <span>

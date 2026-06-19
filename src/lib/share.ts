@@ -107,7 +107,7 @@ const COMPRESSION_TIERS: Array<[number, number]> = [
  */
 export async function encodePuzzleAdaptive(
   cfg: PuzzleConfig,
-  targetLen = 16000,
+  targetLen = 12000,
 ): Promise<{ token: string; length: number }> {
   // Image preset (URL distante) : pas de base64, le lien est déjà court.
   if (!cfg.imageData.startsWith("data:")) {
