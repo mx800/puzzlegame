@@ -6,6 +6,36 @@ import { PuzzleConfig } from "../types";
  * renvoyées telles quelles : elles sont déjà courtes et n'ont pas besoin d'être
  * embarquées dans le lien.
  */
+function drawToJpeg(
+  source: CanvasImageSource,
+  w: number,
+  h: number,
+  maxDim: number,
+  quality: number,
+): string | null {
+  const scale = Math.min(1, maxDim / Math.max(w, h));
+  const targetW = Math.max(1, Math.round(w * scale));
+  const targetH = Math.max(1, Math.round(h * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, 0, 0, targetW, targetH);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+/**
+ * Compresse/redimensionne une image (dataURL base64) en JPEG côté navigateur
+ * afin de garder un lien de partage court. Les URLs distantes (presets) sont
+ * renvoyées telles quelles.
+ *
+ * Utilise `createImageBitmap` en priorité : sur mobile (Android/iOS) c'est bien
+ * plus fiable que `new Image()` pour décoder de très grandes photos (12-48 MP)
+ * et applique correctement l'orientation EXIF. Repli sur `<img>` si indisponible.
+ */
 export async function compressImage(
   src: string,
   maxDim = 900,
@@ -16,25 +46,28 @@ export async function compressImage(
     return src;
   }
 
+  // Voie robuste mobile : createImageBitmap depuis un Blob.
+  if (typeof createImageBitmap === "function") {
+    try {
+      const blob = await (await fetch(src)).blob();
+      const bitmap = await createImageBitmap(blob);
+      const out = drawToJpeg(bitmap, bitmap.width, bitmap.height, maxDim, quality);
+      bitmap.close?.();
+      if (out) return out;
+    } catch {
+      // On bascule sur le repli <img> ci-dessous.
+    }
+  }
+
+  // Repli : élément <img> classique.
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const { width, height } = img;
-      const scale = Math.min(1, maxDim / Math.max(width, height));
-      const targetW = Math.round(width * scale);
-      const targetH = Math.round(height * scale);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        // Pas de contexte canvas : on retombe sur l'image d'origine.
-        resolve(src);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const out = drawToJpeg(img, w, h, maxDim, quality);
+      // Sans contexte canvas, on retombe sur l'image d'origine.
+      resolve(out ?? src);
     };
     img.onerror = () => reject(new Error("Impossible de charger l'image"));
     img.src = src;

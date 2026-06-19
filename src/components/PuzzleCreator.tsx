@@ -492,6 +492,9 @@ export const PuzzleCreator: React.FC = () => {
                   {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 </button>
               </div>
+              <p className="text-[10px] text-neutral-500 font-mono">
+                Longueur du lien : {linkLength.toLocaleString("fr-FR")} caractères
+              </p>
               {linkLength > 14000 && (
                 <p className="text-[11px] text-amber-300/90 leading-relaxed flex items-start gap-1.5">
                   <Flame className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400" />
