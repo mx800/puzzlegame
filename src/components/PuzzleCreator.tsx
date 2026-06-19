@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { PresetSelector } from "./PresetSelector";
-import { compressImage, encodePuzzle } from "../lib/share";
+import { encodePuzzleAdaptive } from "../lib/share";
 import {
   Upload,
   User,
@@ -26,6 +26,7 @@ export const PuzzleCreator: React.FC = () => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [linkLength, setLinkLength] = useState(0);
   const [copied, setCopied] = useState(false);
 
   // Spicy setting values set of game creation
@@ -92,19 +93,22 @@ export const PuzzleCreator: React.FC = () => {
 
     setIsSaving(true);
     try {
-      // Compresse l'image uploadée (les presets restent des URLs courtes),
-      // puis encode tout le puzzle dans le lien : aucun serveur requis.
-      const compressedImage = await compressImage(imageData);
-      const token = encodePuzzle({
+      // Compression adaptative : l'image est réduite par paliers jusqu'à un
+      // lien assez court pour survivre à la copie/au partage sur Android, puis
+      // tout le puzzle est encodé dans le lien (aucun serveur requis).
+      const { token, length } = await encodePuzzleAdaptive({
         title: title.trim(),
         author: author.trim() || "Anonyme",
         gridSize,
-        imageData: compressedImage,
+        imageData,
         fogIntensity,
         veilMode,
         createdAt: Date.now(),
       });
       setShareToken(token);
+      setLinkLength(
+        `${window.location.origin}${window.location.pathname}#p=`.length + length,
+      );
     } catch (err) {
       console.error(err);
       alert("Impossible de générer le lien du puzzle. Réessayez avec une autre image.");
@@ -118,9 +122,21 @@ export const PuzzleCreator: React.FC = () => {
     return `${window.location.origin}${window.location.pathname}#p=${shareToken}`;
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboard = async () => {
     const url = getSharingUrl();
-    navigator.clipboard.writeText(url);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Repli pour navigateurs/contextes sans Clipboard API (anciens mobiles).
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -476,6 +492,17 @@ export const PuzzleCreator: React.FC = () => {
                   {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 </button>
               </div>
+              {linkLength > 18000 && (
+                <p className="text-[11px] text-amber-300/90 leading-relaxed flex items-start gap-1.5">
+                  <Flame className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400" />
+                  <span>
+                    Ce lien est long (~{Math.round(linkLength / 1000)} k caractères) car la
+                    photo y est intégrée. Sur mobile, utilisez le bouton « Copier » puis
+                    collez-le dans WhatsApp, Telegram ou un email — évitez le SMS, qui peut le
+                    tronquer. Pour un lien plus court, recadrez l'image avant de l'importer.
+                  </span>
+                </p>
+              )}
             </div>
 
             {/* Direct buttons */}
@@ -492,6 +519,7 @@ export const PuzzleCreator: React.FC = () => {
                 id="create-new-puzzle-btn"
                 onClick={() => {
                   setShareToken(null);
+                  setLinkLength(0);
                   setTitle("");
                   setAuthor("");
                 }}

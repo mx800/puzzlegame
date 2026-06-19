@@ -83,6 +83,48 @@ export function encodePuzzle(cfg: PuzzleConfig): string {
   return toBase64Url(JSON.stringify(payload));
 }
 
+/** Paliers de compression décroissants : [côté max en px, qualité JPEG]. */
+const COMPRESSION_TIERS: Array<[number, number]> = [
+  [820, 0.62],
+  [680, 0.55],
+  [560, 0.5],
+  [460, 0.45],
+  [380, 0.4],
+  [320, 0.38],
+];
+
+/**
+ * Encode un puzzle en réduisant l'image par paliers jusqu'à ce que le token
+ * reste sous `targetLen` caractères.
+ *
+ * Indispensable pour les photos prises sur mobile (souvent 12-48 MP) : un lien
+ * trop long est tronqué par Android au moment de la copie / du partage (limites
+ * du presse-papiers et des Intents système), ce qui casse le décodage chez le
+ * destinataire ("Secret Introuvable"). Sur ordinateur le presse-papiers tolère
+ * de longues chaînes, d'où le fonctionnement.
+ *
+ * Retourne le token final et sa longueur (pour avertir si le lien reste long).
+ */
+export async function encodePuzzleAdaptive(
+  cfg: PuzzleConfig,
+  targetLen = 16000,
+): Promise<{ token: string; length: number }> {
+  // Image preset (URL distante) : pas de base64, le lien est déjà court.
+  if (!cfg.imageData.startsWith("data:")) {
+    const token = encodePuzzle(cfg);
+    return { token, length: token.length };
+  }
+
+  let token = "";
+  for (let i = 0; i < COMPRESSION_TIERS.length; i++) {
+    const [maxDim, quality] = COMPRESSION_TIERS[i];
+    const image = await compressImage(cfg.imageData, maxDim, quality);
+    token = encodePuzzle({ ...cfg, imageData: image });
+    if (token.length <= targetLen || i === COMPRESSION_TIERS.length - 1) break;
+  }
+  return { token, length: token.length };
+}
+
 /** Décode un token de lien en PuzzleConfig, ou `null` si invalide. */
 export function decodePuzzle(token: string): PuzzleConfig | null {
   try {
